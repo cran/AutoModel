@@ -1,0 +1,101 @@
+---
+title: "Introduction to AutoModel"
+author: "Alex Lishinski"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{AutoModel}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+AutoModel is an R package that makes it easier to create hierarchical multiple regression models, check model assumptions and get appropriate output.
+
+With hierarchical multiple regression models, one wants model statistics and coefficients for each successive iteration of the model.  There are ways to do this in R of course, but they aren't particularly convenient when one wants to get all of the model overall statistics and coefficients for each iteration of the model, in one place in an easy to read format.  Furthermore, this package makes it easy to check all of the standard multiple regression assumptions for a model without having to write any additional code, which makes it very easy to run many different versions of a model in quick succession.
+
+## Running a basic Hierarchical Multiple Regression Model
+
+With the main `run_model` function, one can easily review all model statistics, coefficients, and check assumptions for a Hierarchical Multiple Regression model with predictors entered progressively in blocks.
+
+For the following example, the built in dataset `mtcars` is used to build a hierarchical multiple regression model with 3 blocks of predictors.
+
+Blocks of predictors are specified by character vectors containing the variable names.  The outcome is simply a string of the variable name.  The dataset name must also be specified.
+
+```{r, fig.width=6, fig.height=5}
+library(AutoModel)
+run_model("mpg", c("disp", "hp"), c("cyl", "wt"), c("drat", "qsec"), dataset=mtcars)
+```
+
+## Creating Hierarchical Models
+
+Underlying the `run_model` function is a function to create the hierarchical models.  The `create_model_objects` function creates a list of `lm` objects that `run_model` uses to prepare output.  This function can be used separately to create model objects that can be used for the further purposes of the user that go beyond what is enabled by the `run_model` function.
+
+This function works in combination with the `create_formula_objects`, which creates a list containing the hierarchical model formulas from the character vectors of predictors.
+
+An example of how this works is as follows.  The parameters for `create_formula_objects` are the outcome and predictors, whereas the dataset is passed to `create_model_objects`.
+
+```{r}
+formulas <- create_formula_objects("mpg", c("disp", "hp"), c("cyl", "wt"), c("drat", "qsec"))
+models <- create_model_objects(formulas, dataset = mtcars)
+models
+```
+
+## Assumptions Check Option
+
+The function `run_model` also allows you to choose whether or not to display the output for the assumptions check function.  If multiple similar models are being analyzed, you may not need to see all of the output, so the `assumptions.check` binary flag parameter can be used to suppress this output.
+
+```{r, fig.width=6, fig.height=5}
+run_model("mpg", c("disp", "hp"), c("cyl", "wt"), c("drat", "qsec"), dataset=mtcars, assumptions.check = F)
+```
+
+## Model Return Object
+
+Saving the results of `run_model` saves an `lm`-like list (of lists) which contains all of the model summary, coefficient and assumption data to make it available for further use.  The contents of the object are demonstrated below
+
+```{r, fig.width=6, fig.height=5}
+model_object <- run_model("mpg", c("disp", "hp"), c("cyl", "wt"), c("drat", "qsec"), dataset=mtcars)
+model_object$Summary
+model_object$Coefficients
+model_object$Checks
+```
+
+Subsets of the information in the three main lists can also be accessed as follows.
+
+```{r}
+model_object$Summary$DeltaR2
+model_object$Coefficients$estimate
+model_object$Checks$Correlation.Matrix
+```
+
+The model return object also contains the two main output dataframes for summary and coefficients.  These can be printed in knitr for more aesthetically pleasing output using xtable.
+
+```{r xtable, results='asis'}
+library(xtable)
+sum_table <- xtable(model_object$SummaryDF)
+coef_table <- xtable(model_object$CoefficientsDF)
+print(sum_table, type="html")
+print(coef_table, type="html")
+```
+
+## Running a Hierarchical Binary Logistic Regression Model
+
+The binary logistic regression version of the `run_model` function provides similar but different output for a hierarchical binary logistic regression model.  Output includes a model summary table containing 4 different versions of pseudo R^2 values, a coefficient table with estimates, standard errors, wald test and p values, and a classification table that assesses the prediction accuracy of the binary regression function using an optimal cutpoint.  Like the standard hierarchical multiple regression model, these elements of the output are also accessible as individual data frame objects.
+
+```{r}
+model <- run_model("am", c("disp", "hp"), c("cyl", "wt"), dataset = mtcars, type="binomial")
+model$Summary
+model$Coefficients
+model$Class_Table
+```
+
+Like the standard multiple regression, these output objects can also be printed as handsome latex tables for the purposes of knitr documents.
+
+```{r, results='asis'}
+sum_table <- xtable(model$Summary)
+coef_table <- xtable(model$Coefficients)
+class_table <- xtable(model$Class_Table)
+print(sum_table, type="html")
+print(coef_table, type="html", digits = 4)
+print(class_table, type="html")
+```
+
